@@ -64,7 +64,8 @@ def simulate(N, sampleTime, vehicle):
     t = 0                       # initial simulation time
 
     # Initial state vectors
-    eta = np.array([0, 0, 0, 0, 0, 0], float)    # position/attitude, user editable
+    # Changed z-position (eta[2]) from 0.0 to 10.0 to start underwater
+    eta = np.array([0, 0, 10.0, 0, 0, 0], float)  # position/attitude, user editable
     nu = vehicle.nu                              # velocity, defined by vehicle class
     u_actual = vehicle.u_actual                  # actual inputs, defined by vehicle class
     
