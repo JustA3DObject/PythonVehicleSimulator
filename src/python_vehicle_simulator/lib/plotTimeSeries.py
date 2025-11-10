@@ -396,8 +396,31 @@ def plot3D(simData, numDataPoints, FPS, filename, figNo):
     # Convert to plot coordinates (E, N, U)
     x_plot = e
     y_plot = n
-    z_plot = -d #Up is negative down
-    
+    z_plot = -d # Up is negative down
+
+    # Setup the figure
+    fig = plt.figure(figNo,figsize=(cm2inch(figSize1[0]),cm2inch(figSize1[1])),
+               dpi=dpiValue)
+    ax = p3.Axes3D(fig, auto_add_to_figure=False)
+    fig.add_axes(ax)
+
+    # Store artist handles
+    auv_artists = {
+        'nose': None, 'mid': None, 'tail': None,
+        'dvl': None, 'fins': [],
+    }
+
+    # Plot full trajectory line
+    ax.plot(x_plot, y_plot, z_plot, lw=2, c='b', label='Trajectory', alpha=0.5)
+    ax.plot(x_plot[0:1], y_plot[0:1], z_plot[0:1], 'go', markerfacecolor='green', markersize=8, label='Start')
+    ax.plot(x_plot[-1:], y_plot[-1:], z_plot[-1:], 'rs', markerfacecolor='red', markersize=8, label='End')
+    ax.legend(fontsize=legendSize)
+
+    # Set axis lables
+    ax.set_xlabel('X / East (m)')
+    ax.set_ylabel('Y / North (m)')
+    ax.set_zlabel('Z / Up (m)')
+    ax.set_title('3D AUV Simulation')
 
     # # State vectors
     # x = simData[:,0]
