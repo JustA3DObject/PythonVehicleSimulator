@@ -381,6 +381,23 @@ def plot3D(simData, numDataPoints, FPS, filename, figNo):
 
     auv_model = AUVGeometry(auv_geo)
 
+    # Downsample simData to numDataPoints
+    step = max(1, len(simData // numDataPoints))
+    data = simData[::step]
+
+    # Extract states (N, E, D, phi, theta, psi) 
+    n = data[:, 0] # North
+    e = data[:, 1] # East
+    d = data[:, 2] # Down
+    phi = data[:, 3] # Roll
+    theta = data[:, 4] # Pitch
+    psi = data[:, 5] # Yaw
+
+    # Convert to plot coordinates (E, N, U)
+    x_plot = e
+    y_plot = n
+    z_plot = -d #Up is negative down
+    
 
     # # State vectors
     # x = simData[:,0]
