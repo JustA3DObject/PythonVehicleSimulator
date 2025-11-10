@@ -65,8 +65,13 @@ def plotVehicleStates(simTime, simData, figNo):
     plt.grid()
 
     plt.subplot(3, 3, 1)
-    plt.plot(y, x)
-    plt.legend(["North-East positions (m)"], fontsize=legendSize)
+    plt.plot(y, x, label='Trajectory')
+    plt.plot(y[0], x[0], 'go', markersize=5, label='Start') # Start marker
+    plt.plot(y[-1], x[-1], 'rs', markersize=5, label='End') # End marker
+    plt.legend(fontsize=legendSize)
+    plt.xlabel('North (m)')
+    plt.ylabel('East (m)')
+    plt.title('North-East Trajectory')
     plt.grid()
 
     plt.subplot(3, 3, 2)
@@ -181,7 +186,7 @@ def plot3D(simData,numDataPoints,FPS,filename,figNo):
         
         return line
     
-    dataSet = np.array([N, E, -D])      # Down is negative z
+    dataSet = np.array([E, N, -D])      # (East, North, Up)
     
     # Attaching 3D axis to the figure
     fig = plt.figure(figNo,figsize=(cm2inch(figSize1[0]),cm2inch(figSize1[1])),
@@ -190,7 +195,12 @@ def plot3D(simData,numDataPoints,FPS,filename,figNo):
     fig.add_axes(ax) 
     
     # Line/trajectory plot
-    line = plt.plot(dataSet[0], dataSet[1], dataSet[2], lw=2, c='b')[0] 
+    line = plt.plot(dataSet[0], dataSet[1], dataSet[2], lw=2, c='b', label='Trajectory')[0] 
+
+    # Add Start and End markers
+    ax.plot(dataSet[0, 0], dataSet[1, 0], dataSet[2, 0], 'go', markerfacecolor='green', markersize=5, label='Start')
+    ax.plot(dataSet[0, -1], dataSet[1, -1], dataSet[2, -1], 'rs', markerfacecolor='red', markersize=5, label='End')
+    ax.legend()
 
     # Setting the axes properties
     ax.set_xlabel('X / East')
@@ -224,5 +234,4 @@ def plot3D(simData,numDataPoints,FPS,filename,figNo):
                          repeat=True)
     
     # Save the 3D animation as a gif file
-    ani.save(filename, writer=animation.PillowWriter(fps=FPS))  
-
+    ani.save(filename, writer=animation.PillowWriter(fps=FPS))
