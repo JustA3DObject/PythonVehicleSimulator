@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from python_vehicle_simulator.lib.gnc import ssa
 import mpl_toolkits.mplot3d.axes3d as p3
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import matplotlib.animation as animation
 
 legendSize = 10  # legend size
@@ -29,6 +30,188 @@ def R2D(value):  # radians to degrees
 def cm2inch(value):  # inch to cm
     return value / 2.54
 
+# AUV Geometry 
+
+class AUVGeometry:
+    """
+    Handles the generation and transformation of the 3D AUV model geometry.
+    """
+    def __init__(self, geometry):
+        self.geometry = geometry
+        self.L = geometry['l'] # Store total length for COM shift
+        self.generate_base_geometry()
+
+    def generate_base_geometry(self):
+        """Generate the AUV geometry"""
+        geo = self.geometry
+        
+        r_max = geo['d'] / 2
+        num_x_points = 20 # Reduced for faster animation
+        num_theta_points = 18 # Reduced for faster animation
+        theta = np.linspace(0, 2 * np.pi, num_theta_points)
+        z_offset = 0.001
+        
+        # NOSE SECTION (Elipsoid)
+        x_nose = np.linspace(0, geo['a'], num_x_points)
+        r_nose = r_max - (r_max - geo['a_offset']) * (1 - x_nose / geo['a'])**geo['n']
+        
+        X_nose, THETA_nose = np.meshgrid(x_nose, theta)
+        R_nose, _ = np.meshgrid(r_nose, theta)
+        Y_nose = R_nose * np.cos(THETA_nose)
+        Z_nose = R_nose * np.sin(THETA_nose)
+
+        # MID-SECTION (Cylinder)
+        mid_section_length = geo['lf'] - geo['a']
+        num_x_mid_points = max(2, int(num_x_points * (mid_section_length / geo['a'])))
+        x_mid = np.linspace(geo['a'], geo['lf'], num_x_mid_points)
+        r_mid = np.full_like(x_mid, r_max)
+        
+        X_mid, THETA_mid = np.meshgrid(x_mid, theta)
+        R_mid, _ = np.meshgrid(r_mid, theta)
+        Y_mid = R_mid * np.cos(THETA_mid)
+        Z_mid = R_mid * np.sin(THETA_mid)
+
+        # TAIL SECTION (Power Series Curve of Revolution)
+        c = geo['l'] - geo['lf']
+        num_x_tail_points = max(2, int(num_x_points * (c / geo['a'])))
+        x_tail = np.linspace(geo['lf'], geo['l'], num_x_tail_points)
+        
+        x_norm_tail = (x_tail - geo['lf']) / c
+        r_tail = geo['c_offset'] + (r_max - geo['c_offset']) * (1 - x_norm_tail**geo['n'])
+        
+        X_tail, THETA_tail = np.meshgrid(x_tail, theta)
+        R_tail, _ = np.meshgrid(r_tail, theta)
+        Y_tail = R_tail * np.cos(THETA_tail)
+        Z_tail = R_tail * np.sin(THETA_tail)
+        
+        r_final = geo['c_offset']
+
+        # DVL (Doppler Velocity Log) Box
+        dvl_len = 0.1
+        dvl_width = 0.08
+        dvl_height = 0.03
+        x_dvl_start = geo['lf'] - dvl_len - 0.05
+        x_dvl_end = x_dvl_start + dvl_len
+        y_dvl_half = dvl_width / 2
+        z_dvl_top = -r_max # Note: Z-down in body frame
+        z_dvl_bottom = z_dvl_top - dvl_height
+        v = np.array([
+            [x_dvl_start, -y_dvl_half, z_dvl_top], [x_dvl_end, -y_dvl_half, z_dvl_top],
+            [x_dvl_end, y_dvl_half, z_dvl_top], [x_dvl_start, y_dvl_half, z_dvl_top],
+            [x_dvl_start, -y_dvl_half, z_dvl_bottom], [x_dvl_end, -y_dvl_half, z_dvl_bottom],
+            [x_dvl_end, y_dvl_half, z_dvl_bottom], [x_dvl_start, y_dvl_half, z_dvl_bottom]
+        ])
+        dvl_faces = [
+            [v[0], v[1], v[2], v[3]], [v[4], v[5], v[6], v[7]], [v[0], v[1], v[5], v[4]],
+            [v[2], v[3], v[7], v[6]], [v[0], v[3], v[7], v[4]], [v[1], v[2], v[6], v[5]]
+        ]
+
+        # Fins
+        fin_length = 0.12
+        fin_span = 0.1
+        fin_taper_ratio = 0.8
+        fin_x_end = geo['l'] - 0.025 
+        fin_x_start = fin_x_end - fin_length
+        
+        x_norm_fin_start = (fin_x_start - geo['lf']) / c
+        r_fin_start = geo['c_offset'] + (r_max - geo['c_offset']) * (1 - x_norm_fin_start**geo['n'])
+        x_norm_fin_end = (fin_x_end - geo['lf']) / c
+        r_fin_end = geo['c_offset'] + (r_max - geo['c_offset']) * (1 - x_norm_fin_end**geo['n'])
+        
+        fin_verts = []
+        # Starboard (Y+) Fin
+        v1 = [fin_x_start, r_fin_start, 0]; v2 = [fin_x_start, r_fin_start + fin_span, 0]
+        v3 = [fin_x_end, r_fin_end + fin_span * fin_taper_ratio, 0]; v4 = [fin_x_end, r_fin_end, 0]
+        fin_verts.append([v1, v2, v3, v4])
+        # Port (Y-) Fin
+        v1 = [fin_x_start, -r_fin_start, 0]; v2 = [fin_x_start, -(r_fin_start + fin_span), 0]
+        v3 = [fin_x_end, -(r_fin_end + fin_span * fin_taper_ratio), 0]; v4 = [fin_x_end, -r_fin_end, 0]
+        fin_verts.append([v1, v2, v3, v4])
+        # Top (Z-) Fin (Z is down, so -r is "up" visually on plot)
+        v1 = [fin_x_start, 0, -r_fin_start]; v2 = [fin_x_start, 0, -(r_fin_start + fin_span)]
+        v3 = [fin_x_end, 0, -(r_fin_end + fin_span * fin_taper_ratio)]; v4 = [fin_x_end, 0, -r_fin_end]
+        fin_verts.append([v1, v2, v3, v4])
+        # Bottom (Z+) Fin
+        v1 = [fin_x_start, 0, r_fin_start]; v2 = [fin_x_start, 0, r_fin_start + fin_span]
+        v3 = [fin_x_end, 0, r_fin_end + fin_span * fin_taper_ratio]; v4 = [fin_x_end, 0, r_fin_end]
+        fin_verts.append([v1, v2, v3, v4])
+        
+        # Store all geometry
+        self.base_geometry = {
+            'nose': (X_nose, Y_nose, Z_nose),
+            'mid': (X_mid, Y_mid, Z_mid),
+            'tail': (X_tail, Y_tail, Z_tail),
+            'dvl_faces': dvl_faces,
+        }
+        self.fins = fin_verts
+
+    def rotation_matrix(self, roll, pitch, yaw):
+        """Create rotation matrix from Euler angles (ZYX convention)"""
+        # Rotation around x-axis (roll)
+        Rx = np.array([
+            [1, 0, 0],
+            [0, np.cos(roll), -np.sin(roll)],
+            [0, np.sin(roll), np.cos(roll)]
+        ])
+        # Rotation around y-axis (pitch)
+        Ry = np.array([
+            [np.cos(pitch), 0, np.sin(pitch)],
+            [0, 1, 0],
+            [-np.sin(pitch), 0, np.cos(pitch)]
+        ])
+        # Rotation around z-axis (yaw)
+        Rz = np.array([
+            [np.cos(yaw), -np.sin(yaw), 0],
+            [np.sin(yaw), np.cos(yaw), 0],
+            [0, 0, 1]
+        ])
+        # Combined rotation: Rz * Ry * Rx
+        return Rz @ Ry @ Rx
+    
+    def transform_geometry(self, X, Y, Z, position, orientation):
+        """Apply position and orientation to geometry points"""
+        # Apply COM shift: subtract L/2 from X before rotation
+        points = np.stack([X.flatten() - (self.L / 2.0), Y.flatten(), Z.flatten()])
+        
+        R = self.rotation_matrix(*orientation)
+        rotated = R @ points
+        translated = rotated + position.reshape(3, 1)
+
+        X_new = translated[0].reshape(X.shape)
+        Y_new = translated[1].reshape(Y.shape)
+        Z_new = translated[2].reshape(Z.shape)
+
+        return X_new, Y_new, Z_new
+    
+    def transform_fins(self, position, orientation):
+        """Transform fin vertices"""
+        transformed_fins = []
+        R = self.rotation_matrix(*orientation)
+        for fin in self.fins:
+            fin_array = np.array(fin)
+            # Apply COM shift: subtract L/2 from x-coordinates
+            fin_array[:, 0] -= (self.L / 2.0)
+            
+            rotated = (R @ fin_array.T).T
+            translated = rotated + position
+            transformed_fins.append(translated)
+        return transformed_fins
+    
+    def transform_dvl(self, position, orientation):
+        """Transform DVL box"""
+        R = self.rotation_matrix(*orientation)
+        transformed_faces = []
+        for face in self.base_geometry['dvl_faces']:
+            face_array = np.array(face)
+            
+            # Apply COM shift: subtract L/2 from x-coordinates
+            face_array_shifted = face_array.copy()
+            face_array_shifted[:, 0] -= (self.L / 2.0)
+            
+            rotated = (R @ face_array_shifted.T).T
+            translated = rotated + position
+            transformed_faces.append(translated)
+        return transformed_faces
 
 # plotVehicleStates(simTime, simData, figNo) plots the 6-DOF vehicle
 # position/attitude and velocities versus time in figure no. figNo
