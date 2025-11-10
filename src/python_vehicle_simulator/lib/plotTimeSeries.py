@@ -346,75 +346,107 @@ def plotControls(simTime, simData, vehicle, figNo):
         plt.grid()
 
 
-# plot3D(simData,numDataPoints,FPS,filename,figNo) plots the vehicles position (x, y, z) in 3D
-# in figure no. figNo
-def plot3D(simData,numDataPoints,FPS,filename,figNo):
-        
-    # State vectors
-    x = simData[:,0]
-    y = simData[:,1]
-    z = simData[:,2]
-    
-    # down-sampling the xyz data points
-    N = y[::len(x) // numDataPoints];
-    E = x[::len(x) // numDataPoints];
-    D = z[::len(x) // numDataPoints];
-    
-    # Animation function
-    def anim_function(num, dataSet, line):
-        
-        line.set_data(dataSet[0:2, :num])    
-        line.set_3d_properties(dataSet[2, :num])    
-        ax.view_init(elev=10.0, azim=-120.0)
-        
-        return line
-    
-    dataSet = np.array([E, N, -D])      # (East, North, Up)
-    
-    # Attaching 3D axis to the figure
-    fig = plt.figure(figNo,figsize=(cm2inch(figSize1[0]),cm2inch(figSize1[1])),
-               dpi=dpiValue)
-    ax = p3.Axes3D(fig, auto_add_to_figure=False)
-    fig.add_axes(ax) 
-    
-    # Line/trajectory plot
-    line = plt.plot(dataSet[0], dataSet[1], dataSet[2], lw=2, c='b', label='Trajectory')[0] 
+# plot3D(simData,numDataPoints,FPS,filename,figNo) plots the vehicles position
+# (x, y, z) in 3D in figure no. figNo
+def plot3D(simData, numDataPoints, FPS, filename, figNo):
+    """
+    Animates the AUV's 3D trajectory using the full vehicle geometry,
+    with the COM on the trajectory and the nose pointing along the
+    physical vehicle heading (psi).
+    """        
 
-    # Add Start and End markers
-    ax.plot(dataSet[0, 0], dataSet[1, 0], dataSet[2, 0], 'go', markerfacecolor='green', markersize=5, label='Start')
-    ax.plot(dataSet[0, -1], dataSet[1, -1], dataSet[2, -1], 'rs', markerfacecolor='red', markersize=5, label='End')
-    ax.legend()
-
-    # Setting the axes properties
-    ax.set_xlabel('X / East')
-    ax.set_ylabel('Y / North')
-    ax.set_zlim3d([-100, 20])                   # default depth = -100 m
+    # AUV geometry model 
+    # Parameters from remus100.py
+    L = 1.6 
+    D = 0.19
     
-    if np.amax(z) > 100.0:
-        ax.set_zlim3d([-np.amax(z), 20])
-        
-    ax.set_zlabel('-Z / Down')
+    # Parameters from auv_model.py
+    old_L = 1.33
+    old_a = 0.191
+    old_a_offset = 0.0165
+    old_c_offset = 0.0368
+    old_lf = 0.828
+    
+    scale_ratio = L / old_L
 
-    # Plot 2D surface for z = 0
-    [x_min, x_max] = ax.get_xlim()
-    [y_min, y_max] = ax.get_ylim()
-    x_grid = np.arange(x_min-20, x_max+20)
-    y_grid = np.arange(y_min-20, y_max+20)
-    [xx, yy] = np.meshgrid(x_grid, y_grid)
-    zz = 0 * xx
-    ax.plot_surface(xx, yy, zz, alpha=0.3)
+    auv_geo = {
+        'a': old_a * scale_ratio,
+        'a_offset': old_a_offset * scale_ratio,
+        'c_offset': old_c_offset * scale_ratio,
+        'n': 2,
+        'd': D,
+        'lf': old_lf * scale_ratio,
+        'l': L,
+    }
+
+    auv_model = AUVGeometry(auv_geo)
+
+
+    # # State vectors
+    # x = simData[:,0]
+    # y = simData[:,1]
+    # z = simData[:,2]
+    
+    # # down-sampling the xyz data points
+    # N = y[::len(x) // numDataPoints];
+    # E = x[::len(x) // numDataPoints];
+    # D = z[::len(x) // numDataPoints];
+    
+    # # Animation function
+    # def anim_function(num, dataSet, line):
+        
+    #     line.set_data(dataSet[0:2, :num])    
+    #     line.set_3d_properties(dataSet[2, :num])    
+    #     ax.view_init(elev=10.0, azim=-120.0)
+        
+    #     return line
+    
+    # dataSet = np.array([E, N, -D])      # (East, North, Up)
+    
+    # # Attaching 3D axis to the figure
+    # fig = plt.figure(figNo,figsize=(cm2inch(figSize1[0]),cm2inch(figSize1[1])),
+    #            dpi=dpiValue)
+    # ax = p3.Axes3D(fig, auto_add_to_figure=False)
+    # fig.add_axes(ax) 
+    
+    # # Line/trajectory plot
+    # line = plt.plot(dataSet[0], dataSet[1], dataSet[2], lw=2, c='b', label='Trajectory')[0] 
+
+    # # Add Start and End markers
+    # ax.plot(dataSet[0, 0], dataSet[1, 0], dataSet[2, 0], 'go', markerfacecolor='green', markersize=5, label='Start')
+    # ax.plot(dataSet[0, -1], dataSet[1, -1], dataSet[2, -1], 'rs', markerfacecolor='red', markersize=5, label='End')
+    # ax.legend()
+
+    # # Setting the axes properties
+    # ax.set_xlabel('X / East')
+    # ax.set_ylabel('Y / North')
+    # ax.set_zlim3d([-100, 20])                   # default depth = -100 m
+    
+    # if np.amax(z) > 100.0:
+    #     ax.set_zlim3d([-np.amax(z), 20])
+        
+    # ax.set_zlabel('-Z / Down')
+
+    # # Plot 2D surface for z = 0
+    # [x_min, x_max] = ax.get_xlim()
+    # [y_min, y_max] = ax.get_ylim()
+    # x_grid = np.arange(x_min-20, x_max+20)
+    # y_grid = np.arange(y_min-20, y_max+20)
+    # [xx, yy] = np.meshgrid(x_grid, y_grid)
+    # zz = 0 * xx
+    # ax.plot_surface(xx, yy, zz, alpha=0.3)
                     
-    # Title of plot
-    ax.set_title('North-East-Down')
+    # # Title of plot
+    # ax.set_title('North-East-Down')
     
-    # Create the animation object
-    ani = animation.FuncAnimation(fig, 
-                         anim_function, 
-                         frames=numDataPoints, 
-                         fargs=(dataSet,line),
-                         interval=200, 
-                         blit=False,
-                         repeat=True)
+    # # Create the animation object
+    # ani = animation.FuncAnimation(fig, 
+    #                      anim_function, 
+    #                      frames=numDataPoints, 
+    #                      fargs=(dataSet,line),
+    #                      interval=200, 
+    #                      blit=False,
+    #                      repeat=True)
     
-    # Save the 3D animation as a gif file
-    ani.save(filename, writer=animation.PillowWriter(fps=FPS))
+    # # Save the 3D animation as a gif file
+    # ani.save(filename, writer=animation.PillowWriter(fps=FPS))
