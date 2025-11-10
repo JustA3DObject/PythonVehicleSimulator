@@ -422,6 +422,67 @@ def plot3D(simData, numDataPoints, FPS, filename, figNo):
     ax.set_zlabel('Z / Up (m)')
     ax.set_title('3D AUV Simulation')
 
+    def update_frame(num):
+        
+        # Get Physical State
+        position = np.array([x_plot[num], y_plot[num], z_plot[num]])
+        
+        # Create the orientation vector from the physical sim data
+        orientation = np.array([
+            phi[num],   # Physical Roll
+            theta[num], # Physical Pitch
+            psi[num]    # Physical Yaw
+        ])
+        
+        # Clear previous AUV artists
+        if auv_artists['nose']: auv_artists['nose'].remove()
+        if auv_artists['mid']: auv_artists['mid'].remove()
+        if auv_artists['tail']: auv_artists['tail'].remove()
+        if auv_artists['dvl']: auv_artists['dvl'].remove()
+        for art in auv_artists['fins']: art.remove()
+        auv_artists['fins'].clear()
+
+        # Plot Nose
+        Xn, Yn, Zn = auv_model.transform_geometry(
+            *auv_model.base_geometry['nose'], position, orientation)
+        auv_artists['nose'] = ax.plot_surface(Xn, Yn, Zn, color='blue', alpha=0.7, rstride=3, cstride=3)
+        
+        # Plot Mid
+        Xm, Ym, Zm = auv_model.transform_geometry(
+            *auv_model.base_geometry['mid'], position, orientation)
+        auv_artists['mid'] = ax.plot_surface(Xm, Ym, Zm, color='green', alpha=0.7, rstride=3, cstride=3)
+
+        # Plot Tail
+        Xt, Yt, Zt = auv_model.transform_geometry(
+            *auv_model.base_geometry['tail'], position, orientation)
+        auv_artists['tail'] = ax.plot_surface(Xt, Yt, Zt, color='red', alpha=0.7, rstride=3, cstride=3)
+        
+        # Plot DVL
+        dvl_faces = auv_model.transform_dvl(position, orientation)
+        auv_artists['dvl'] = Poly3DCollection(dvl_faces, facecolors='orange', alpha=0.9)
+        ax.add_collection3d(auv_artists['dvl'])
+        
+        # Plot Fins
+        fin_faces = auv_model.transform_fins(position, orientation)
+        for fin_verts in fin_faces:
+            fin_col = Poly3DCollection([fin_verts], facecolors='darkslategrey', alpha=0.9)
+            ax.add_collection3d(fin_col)
+            auv_artists['fins'].append(fin_col)
+                
+        # Set camera to follow AUV
+        offset = 4.0 # Camera distance
+        ax.set_xlim(position[0] - offset, position[0] + offset) # East
+        ax.set_ylim(position[1] - offset, position[1] + offset) # North
+        ax.set_zlim(position[2] - offset, position[2] + offset) # Up
+        
+        # Set view angle
+        ax.view_init(elev=20.0, azim=45.0)
+
+        # Return a list of the artists to be drawn
+        all_artists = [auv_artists['nose'], auv_artists['mid'], auv_artists['tail'], auv_artists['dvl']]
+        all_artists.extend(auv_artists['fins'])
+        return all_artists
+
     # # State vectors
     # x = simData[:,0]
     # y = simData[:,1]
