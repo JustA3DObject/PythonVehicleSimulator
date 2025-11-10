@@ -34,7 +34,7 @@ def cm2inch(value):  # inch to cm
 
 class AUVGeometry:
     """
-    Handles the generation and transformation of the 3D AUV model geometry.
+    Handles the generation and transformation of AUV 3D model geometry.
     """
     def __init__(self, geometry):
         self.geometry = geometry
@@ -248,7 +248,7 @@ def plotVehicleStates(simTime, simData, figNo):
     plt.grid()
 
     plt.subplot(3, 3, 1)
-    plt.plot(y, x, label='Trajectory')
+    plt.plot(y, x, label='Trajectory') # y=North, x=East
     plt.plot(y[0], x[0], 'go', markersize=5, label='Start') # Start marker
     plt.plot(y[-1], x[-1], 'rs', markersize=5, label='End') # End marker
     plt.legend(fontsize=legendSize)
@@ -357,7 +357,7 @@ def plot3D(simData, numDataPoints, FPS, filename, figNo):
 
     # AUV geometry model 
     # Parameters from remus100.py
-    L = 1.6 
+    L = 1.6
     D = 0.19
     
     # Parameters from auv_model.py
@@ -368,7 +368,7 @@ def plot3D(simData, numDataPoints, FPS, filename, figNo):
     old_lf = 0.828
     
     scale_ratio = L / old_L
-
+    
     auv_geo = {
         'a': old_a * scale_ratio,
         'a_offset': old_a_offset * scale_ratio,
@@ -378,11 +378,11 @@ def plot3D(simData, numDataPoints, FPS, filename, figNo):
         'lf': old_lf * scale_ratio,
         'l': L,
     }
-
+    
     auv_model = AUVGeometry(auv_geo)
 
     # Downsample simData to numDataPoints
-    step = max(1, len(simData // numDataPoints))
+    step = max(1, len(simData) // numDataPoints)
     data = simData[::step]
 
     # Extract states (N, E, D, phi, theta, psi) 
@@ -398,7 +398,6 @@ def plot3D(simData, numDataPoints, FPS, filename, figNo):
     y_plot = n
     z_plot = -d # Up is negative down
 
-    # Setup the figure
     fig = plt.figure(figNo,figsize=(cm2inch(figSize1[0]),cm2inch(figSize1[1])),
                dpi=dpiValue)
     ax = p3.Axes3D(fig, auto_add_to_figure=False)
@@ -415,13 +414,14 @@ def plot3D(simData, numDataPoints, FPS, filename, figNo):
     ax.plot(x_plot[0:1], y_plot[0:1], z_plot[0:1], 'go', markerfacecolor='green', markersize=8, label='Start')
     ax.plot(x_plot[-1:], y_plot[-1:], z_plot[-1:], 'rs', markerfacecolor='red', markersize=8, label='End')
     ax.legend(fontsize=legendSize)
-
-    # Set axis lables
+    
+    # Set axis labels
     ax.set_xlabel('X / East (m)')
     ax.set_ylabel('Y / North (m)')
     ax.set_zlabel('Z / Up (m)')
     ax.set_title('3D AUV Simulation')
-
+    
+    # Animation Update Function
     def update_frame(num):
         
         # Get Physical State
@@ -456,7 +456,7 @@ def plot3D(simData, numDataPoints, FPS, filename, figNo):
         Xt, Yt, Zt = auv_model.transform_geometry(
             *auv_model.base_geometry['tail'], position, orientation)
         auv_artists['tail'] = ax.plot_surface(Xt, Yt, Zt, color='red', alpha=0.7, rstride=3, cstride=3)
-        
+
         # Plot DVL
         dvl_faces = auv_model.transform_dvl(position, orientation)
         auv_artists['dvl'] = Poly3DCollection(dvl_faces, facecolors='orange', alpha=0.9)
@@ -483,71 +483,20 @@ def plot3D(simData, numDataPoints, FPS, filename, figNo):
         all_artists.extend(auv_artists['fins'])
         return all_artists
 
-    # # State vectors
-    # x = simData[:,0]
-    # y = simData[:,1]
-    # z = simData[:,2]
+    # Create and Save Animation
+    # Set initial bounds to be reasonable
+    ax.set_xlim(np.min(x_plot)-2, np.max(x_plot)+2)
+    ax.set_ylim(np.min(y_plot)-2, np.max(y_plot)+2)
+    ax.set_zlim(np.min(z_plot)-2, np.max(z_plot)+2)
     
-    # # down-sampling the xyz data points
-    # N = y[::len(x) // numDataPoints];
-    # E = x[::len(x) // numDataPoints];
-    # D = z[::len(x) // numDataPoints];
+    print(f"\nGenerating 3D animation ({len(x_plot)} frames)...")
     
-    # # Animation function
-    # def anim_function(num, dataSet, line):
-        
-    #     line.set_data(dataSet[0:2, :num])    
-    #     line.set_3d_properties(dataSet[2, :num])    
-    #     ax.view_init(elev=10.0, azim=-120.0)
-        
-    #     return line
-    
-    # dataSet = np.array([E, N, -D])      # (East, North, Up)
-    
-    # # Attaching 3D axis to the figure
-    # fig = plt.figure(figNo,figsize=(cm2inch(figSize1[0]),cm2inch(figSize1[1])),
-    #            dpi=dpiValue)
-    # ax = p3.Axes3D(fig, auto_add_to_figure=False)
-    # fig.add_axes(ax) 
-    
-    # # Line/trajectory plot
-    # line = plt.plot(dataSet[0], dataSet[1], dataSet[2], lw=2, c='b', label='Trajectory')[0] 
-
-    # # Add Start and End markers
-    # ax.plot(dataSet[0, 0], dataSet[1, 0], dataSet[2, 0], 'go', markerfacecolor='green', markersize=5, label='Start')
-    # ax.plot(dataSet[0, -1], dataSet[1, -1], dataSet[2, -1], 'rs', markerfacecolor='red', markersize=5, label='End')
-    # ax.legend()
-
-    # # Setting the axes properties
-    # ax.set_xlabel('X / East')
-    # ax.set_ylabel('Y / North')
-    # ax.set_zlim3d([-100, 20])                   # default depth = -100 m
-    
-    # if np.amax(z) > 100.0:
-    #     ax.set_zlim3d([-np.amax(z), 20])
-        
-    # ax.set_zlabel('-Z / Down')
-
-    # # Plot 2D surface for z = 0
-    # [x_min, x_max] = ax.get_xlim()
-    # [y_min, y_max] = ax.get_ylim()
-    # x_grid = np.arange(x_min-20, x_max+20)
-    # y_grid = np.arange(y_min-20, y_max+20)
-    # [xx, yy] = np.meshgrid(x_grid, y_grid)
-    # zz = 0 * xx
-    # ax.plot_surface(xx, yy, zz, alpha=0.3)
-                    
-    # # Title of plot
-    # ax.set_title('North-East-Down')
-    
-    # # Create the animation object
-    # ani = animation.FuncAnimation(fig, 
-    #                      anim_function, 
-    #                      frames=numDataPoints, 
-    #                      fargs=(dataSet,line),
-    #                      interval=200, 
-    #                      blit=False,
-    #                      repeat=True)
-    
-    # # Save the 3D animation as a gif file
-    # ani.save(filename, writer=animation.PillowWriter(fps=FPS))
+    ani = animation.FuncAnimation(fig, 
+                                 update_frame, 
+                                 frames=len(x_plot), # Number of frames
+                                 interval=max(1, 1000/FPS), # ms
+                                 blit=False) # Blit=False is required for 3D
+                                 
+    # Save the 3D animation as a gif file
+    ani.save(filename, writer=animation.PillowWriter(fps=FPS))
+    print(f"Animation saved to {filename}")
