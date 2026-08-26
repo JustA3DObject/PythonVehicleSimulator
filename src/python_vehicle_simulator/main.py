@@ -14,6 +14,7 @@ import os
 import sys 
 import webbrowser
 import matplotlib.pyplot as plt
+import numpy as np
 from python_vehicle_simulator.vehicles import (
     DSRV, frigate, otter, ROVzefakkel, semisub, shipClarke83, supply, tanker, 
     remus100, torpedo
@@ -79,6 +80,9 @@ def main():
     # Main simulation loop 
     [simTime, simData] = simulate(N, sampleTime, vehicle)
     
+    # Reverse simData array to exchange start and end points for plotting
+    simData = np.flip(simData, axis=0)
+    
     # 3D plots and animation
     plotVehicleStates(simTime, simData, 1)                    
     plotControls(simTime, simData, vehicle, 2)
@@ -93,4 +97,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
